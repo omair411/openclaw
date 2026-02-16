@@ -244,4 +244,38 @@ describe("buildEmbeddedRunPayloads", () => {
     expect(payloads[0]?.isError).toBe(true);
     expect(payloads[0]?.text).toContain("connection timeout");
   });
+
+  it("normalizes echoed memory_search JSON when memory_search ran", () => {
+    const memoryEcho =
+      '{"results":[],"provider":"local","model":"hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf","citations":"auto"}';
+    const payloads = buildEmbeddedRunPayloads({
+      assistantTexts: [memoryEcho],
+      toolMetas: [{ toolName: "memory_search" }],
+      lastAssistant: { stopReason: "end_turn" } as AssistantMessage,
+      sessionKey: "session:telegram",
+      inlineToolResultsAllowed: false,
+      verboseLevel: "off",
+      reasoningLevel: "off",
+    });
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]?.text).toBe("No relevant memory was found.");
+  });
+
+  it("does not rewrite similar JSON when memory_search did not run", () => {
+    const memoryEcho =
+      '{"results":[],"provider":"local","model":"hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf","citations":"auto"}';
+    const payloads = buildEmbeddedRunPayloads({
+      assistantTexts: [memoryEcho],
+      toolMetas: [],
+      lastAssistant: { stopReason: "end_turn" } as AssistantMessage,
+      sessionKey: "session:telegram",
+      inlineToolResultsAllowed: false,
+      verboseLevel: "off",
+      reasoningLevel: "off",
+    });
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]?.text).toBe(memoryEcho);
+  });
 });

@@ -50,7 +50,11 @@ function buildMemorySection(params: {
   }
   const lines = [
     "## Memory Recall",
-    "Before answering anything about prior work, decisions, dates, people, preferences, or todos: run memory_search on MEMORY.md + memory/*.md; then use memory_get to pull only the needed lines. If low confidence after search, say you checked.",
+    "Only use memory_search when the user explicitly asks about prior work, earlier decisions, dates, people, preferences, or todos.",
+    "For ordinary conversation or requests about the current message, answer directly and do not call memory_search unless memory recall is actually needed.",
+    "If memory_search returns no results (empty list), explicitly say no relevant memory was found and do not invent or summarize prior work.",
+    "Never fabricate tool calls or tool results. If a tool was not called, do not pretend it was called.",
+    "Never mention billing/quota/API provider errors unless the tool output or a system message explicitly contains them.",
   ];
   if (params.citationsMode === "off") {
     lines.push(
@@ -175,6 +179,8 @@ export function buildAgentSystemPrompt(params: {
   userTime?: string;
   userTimeFormat?: ResolvedTimeFormat;
   contextFiles?: EmbeddedContextFile[];
+  /** Allows global NO_REPLY guidance. Disable for direct conversational sessions. */
+  enableSilentReplies?: boolean;
   skillsPrompt?: string;
   heartbeatPrompt?: string;
   docsPath?: string;
@@ -410,6 +416,7 @@ export function buildAgentSystemPrompt(params: {
     "Narrate only when it helps: multi-step work, complex/challenging problems, sensitive actions (e.g., deletions), or when the user explicitly asks.",
     "Keep narration brief and value-dense; avoid repeating obvious steps.",
     "Use plain human language for narration unless in a technical context.",
+    "Tool outputs are internal context. Never paste raw tool JSON or raw tool output as your final user-facing reply unless explicitly asked.",
     "",
     ...safetySection,
     "## OpenClaw CLI Quick Reference",
@@ -568,8 +575,8 @@ export function buildAgentSystemPrompt(params: {
     }
   }
 
-  // Skip silent replies for subagent/none modes
-  if (!isMinimal) {
+  // Skip silent replies for subagent/none modes and for direct conversational prompts.
+  if (!isMinimal && params.enableSilentReplies !== false) {
     lines.push(
       "## Silent Replies",
       `When you have nothing to say, respond with ONLY: ${SILENT_REPLY_TOKEN}`,

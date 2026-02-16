@@ -1,5 +1,8 @@
 services:
   openclaw-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     environment:
       HOME: /home/node
@@ -11,10 +14,14 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OLLAMA_API_KEY: "ollama-local"
       OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+      OPENCLAW_OLLAMA_DEBUG: 1
+
+      services:
 
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - /Users/macbookpro/openclaw_sandbox/cache/node-llama-cpp:/home/node/.node-llama-cpp
     ports:
       - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "127.0.0.1:${OPENCLAW_BRIDGE_PORT:-18790}:18790"

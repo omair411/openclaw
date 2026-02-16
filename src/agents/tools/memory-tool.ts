@@ -41,7 +41,7 @@ export function createMemorySearchTool(options: {
     label: "Memory Search",
     name: "memory_search",
     description:
-      "Mandatory recall step: semantically search MEMORY.md + memory/*.md (and optional session transcripts) before answering questions about prior work, decisions, dates, people, preferences, or todos; returns top snippets with path + lines.",
+      "Semantically search MEMORY.md + memory/*.md (and optional session transcripts) when you need prior context (work history, decisions, dates, people, preferences, todos). Internal retrieval tool: do not echo raw JSON output to the user.",
     parameters: MemorySearchSchema,
     execute: async (_toolCallId, params) => {
       const query = readStringParam(params, "query", { required: true });

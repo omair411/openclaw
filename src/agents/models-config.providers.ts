@@ -106,13 +106,30 @@ interface OllamaTagsResponse {
   models: OllamaModel[];
 }
 
+function resolveOllamaBaseUrl(): string {
+  const raw = process.env.OLLAMA_BASE_URL?.trim() ?? process.env.OLLAMA_API_BASE_URL?.trim() ?? "";
+  if (!raw) {
+    return OLLAMA_BASE_URL;
+  }
+  const withoutTrailingSlash = raw.replace(/\/+$/, "");
+  if (withoutTrailingSlash.endsWith("/v1")) {
+    return withoutTrailingSlash;
+  }
+  return `${withoutTrailingSlash}/v1`;
+}
+
+function resolveOllamaApiBaseUrl(): string {
+  const baseUrl = resolveOllamaBaseUrl();
+  return baseUrl.replace(/\/v1\/?$/, "");
+}
+
 async function discoverOllamaModels(): Promise<ModelDefinitionConfig[]> {
   // Skip Ollama discovery in test environments
   if (process.env.VITEST || process.env.NODE_ENV === "test") {
     return [];
   }
   try {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/api/tags`, {
+    const response = await fetch(`${resolveOllamaApiBaseUrl()}/api/tags`, {
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) {
@@ -408,7 +425,7 @@ async function buildVeniceProvider(): Promise<ProviderConfig> {
 async function buildOllamaProvider(): Promise<ProviderConfig> {
   const models = await discoverOllamaModels();
   return {
-    baseUrl: OLLAMA_BASE_URL,
+    baseUrl: resolveOllamaBaseUrl(),
     api: "openai-completions",
     models,
   };

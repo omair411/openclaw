@@ -326,6 +326,17 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("respond with ONLY: NO_REPLY");
   });
 
+  it("can disable silent replies guidance for direct sessions", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      toolNames: ["message"],
+      enableSilentReplies: false,
+    });
+
+    expect(prompt).toContain("### message tool");
+    expect(prompt).not.toContain("## Silent Replies");
+  });
+
   it("includes runtime provider capabilities when present", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",

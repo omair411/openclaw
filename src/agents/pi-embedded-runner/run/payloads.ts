@@ -5,6 +5,7 @@ import type { ToolResultFormat } from "../../pi-embedded-subscribe.js";
 import { parseReplyDirectives } from "../../../auto-reply/reply/reply-directives.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../../auto-reply/tokens.js";
 import { formatToolAggregate } from "../../../auto-reply/tool-meta.js";
+import { didUseMemorySearch, normalizeMemorySearchEchoText } from "../../memory-search-echo.js";
 import {
   formatAssistantErrorText,
   formatRawAssistantErrorForUi,
@@ -167,8 +168,10 @@ export function buildEmbeddedRunPayloads(params: {
         ? [fallbackAnswerText]
         : []
   ).filter((text) => !shouldSuppressRawErrorText(text));
+  const memorySearchUsed = didUseMemorySearch(params.toolMetas);
 
   for (const text of answerTexts) {
+    const normalizedText = normalizeMemorySearchEchoText({ text, memorySearchUsed });
     const {
       text: cleanedText,
       mediaUrls,
@@ -176,7 +179,7 @@ export function buildEmbeddedRunPayloads(params: {
       replyToId,
       replyToTag,
       replyToCurrent,
-    } = parseReplyDirectives(text);
+    } = parseReplyDirectives(normalizedText);
     if (!cleanedText && (!mediaUrls || mediaUrls.length === 0) && !audioAsVoice) {
       continue;
     }

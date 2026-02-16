@@ -153,4 +153,10 @@ describe("getDmHistoryLimitFromSessionKey", () => {
     } as OpenClawConfig;
     expect(getDmHistoryLimitFromSessionKey("telegram:dm:123", config)).toBe(0);
   });
+  it("applies a default cap for main control sessions", () => {
+    const config = {
+      channels: {},
+    } as OpenClawConfig;
+    expect(getDmHistoryLimitFromSessionKey("agent:main:main", config)).toBe(12);
+  });
 });

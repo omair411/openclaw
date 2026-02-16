@@ -2,6 +2,8 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { OpenClawConfig } from "../../config/config.js";
 
 const THREAD_SUFFIX_REGEX = /^(.*)(?::(?:thread|topic):\d+)$/i;
+const MAIN_SESSION_REGEX = /^agent:[^:]+:main$/i;
+const DEFAULT_MAIN_SESSION_HISTORY_LIMIT = 12;
 
 function stripThreadSuffix(value: string): string {
   const match = value.match(THREAD_SUFFIX_REGEX);
@@ -45,6 +47,12 @@ export function getDmHistoryLimitFromSessionKey(
 ): number | undefined {
   if (!sessionKey || !config) {
     return undefined;
+  }
+
+  // Web/control sessions use agent:<id>:main and can otherwise grow unbounded.
+  const normalizedSessionKey = stripThreadSuffix(sessionKey);
+  if (MAIN_SESSION_REGEX.test(normalizedSessionKey)) {
+    return DEFAULT_MAIN_SESSION_HISTORY_LIMIT;
   }
 
   const parts = sessionKey.split(":").filter(Boolean);

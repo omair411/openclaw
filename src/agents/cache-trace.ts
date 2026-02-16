@@ -276,7 +276,9 @@ export function createCacheTrace(params: CacheTraceInit): CacheTrace | null {
           provider: model?.provider,
           api: model?.api,
         },
-        system: (context as { system?: unknown }).system,
+        system:
+          (context as { system?: unknown }).system ??
+          (context as { systemPrompt?: unknown }).systemPrompt,
         messages: (context as { messages?: AgentMessage[] }).messages ?? [],
         options: (options ?? {}) as Record<string, unknown>,
       });

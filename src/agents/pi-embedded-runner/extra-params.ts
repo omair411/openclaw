@@ -30,6 +30,21 @@ type CacheRetentionStreamOptions = Partial<SimpleStreamOptions> & {
   cacheRetention?: CacheRetention;
 };
 
+function resolveOllamaNumCtx(
+  extraParams: Record<string, unknown> | undefined,
+  modelContextWindow?: number,
+): number | undefined {
+  const raw = extraParams?.num_ctx ?? extraParams?.numCtx;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return Math.floor(raw);
+  }
+  if (typeof modelContextWindow === "number" && Number.isFinite(modelContextWindow)) {
+    const rounded = Math.floor(modelContextWindow);
+    return rounded > 0 ? rounded : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Resolve cacheRetention from extraParams, supporting both new `cacheRetention`
  * and legacy `cacheControlTtl` values for backwards compatibility.
@@ -117,6 +132,28 @@ function createOpenRouterHeadersWrapper(baseStreamFn: StreamFn | undefined): Str
     });
 }
 
+function createOllamaNumCtxWrapper(baseStreamFn: StreamFn | undefined, numCtx: number): StreamFn {
+  const underlying = baseStreamFn ?? streamSimple;
+  return (model, context, options) =>
+    underlying(model, context, {
+      ...options,
+      onPayload: (payload) => {
+        if (payload && typeof payload === "object") {
+          const body = payload as Record<string, unknown>;
+          const current = body.options;
+          const nextOptions =
+            current && typeof current === "object" && !Array.isArray(current)
+              ? { ...(current as Record<string, unknown>), num_ctx: numCtx }
+              : { num_ctx: numCtx };
+          body.options = nextOptions;
+          body.num_ctx = numCtx;
+          body.numCtx = numCtx;
+        }
+        options?.onPayload?.(payload);
+      },
+    });
+}
+
 /**
  * Apply extra params (like temperature) to an agent's streamFn.
  * Also adds OpenRouter app attribution headers when using the OpenRouter provider.
@@ -129,6 +166,7 @@ export function applyExtraParamsToAgent(
   provider: string,
   modelId: string,
   extraParamsOverride?: Record<string, unknown>,
+  modelContextWindow?: number,
 ): void {
   const extraParams = resolveExtraParams({
     cfg,
@@ -152,5 +190,13 @@ export function applyExtraParamsToAgent(
   if (provider === "openrouter") {
     log.debug(`applying OpenRouter app attribution headers for ${provider}/${modelId}`);
     agent.streamFn = createOpenRouterHeadersWrapper(agent.streamFn);
+  }
+
+  if (provider === "ollama") {
+    const numCtx = resolveOllamaNumCtx(merged, modelContextWindow);
+    if (numCtx) {
+      log.debug(`applying Ollama num_ctx=${numCtx} for ${provider}/${modelId}`);
+      agent.streamFn = createOllamaNumCtxWrapper(agent.streamFn, numCtx);
+    }
   }
 }

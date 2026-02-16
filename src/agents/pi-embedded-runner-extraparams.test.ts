@@ -91,4 +91,37 @@ describe("applyExtraParamsToAgent", () => {
       "X-Custom": "1",
     });
   });
+
+  it("injects ollama num_ctx into payload via onPayload", () => {
+    const payloads: Array<Record<string, unknown>> = [];
+    const baseStreamFn: StreamFn = (_model, _context, options) => {
+      options?.onPayload?.({ model: "llama3.1:8b" });
+      return new AssistantMessageEventStream();
+    };
+    const agent = { streamFn: baseStreamFn };
+
+    applyExtraParamsToAgent(agent, undefined, "ollama", "llama3.1:8b", undefined, 8192);
+
+    const model = {
+      api: "openai-completions",
+      provider: "ollama",
+      id: "llama3.1:8b",
+    } as Model<"openai-completions">;
+    const context: Context = { messages: [] };
+
+    void agent.streamFn?.(model, context, {
+      onPayload: (payload) => {
+        if (payload && typeof payload === "object") {
+          payloads.push(payload as Record<string, unknown>);
+        }
+      },
+    });
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]).toMatchObject({
+      options: { num_ctx: 8192 },
+      num_ctx: 8192,
+      numCtx: 8192,
+    });
+  });
 });

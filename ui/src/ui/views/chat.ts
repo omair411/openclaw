@@ -2,7 +2,7 @@ import { html, nothing } from "lit";
 import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
 import type { SessionsListResult } from "../types.ts";
-import type { ChatItem, MessageGroup } from "../types/chat-types.ts";
+import type { ChatItem, MessageGroup, NormalizedMessage } from "../types/chat-types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../ui-types.ts";
 import {
   renderMessageGroup,
@@ -71,6 +71,18 @@ export type ChatProps = {
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
+const SILENT_REPLY_TOKEN = "NO_REPLY";
+
+function isSilentReplyMessage(message: NormalizedMessage): boolean {
+  if (message.content.length !== 1) {
+    return false;
+  }
+  const [item] = message.content;
+  if (item.type !== "text") {
+    return false;
+  }
+  return (item.text ?? "").trim() === SILENT_REPLY_TOKEN;
+}
 
 function adjustTextareaHeight(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -487,6 +499,9 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   for (let i = historyStart; i < history.length; i++) {
     const msg = history[i];
     const normalized = normalizeMessage(msg);
+    if (isSilentReplyMessage(normalized)) {
+      continue;
+    }
     const raw = msg as Record<string, unknown>;
     const marker = raw.__openclaw as Record<string, unknown> | undefined;
     if (marker && marker.kind === "compaction") {
@@ -524,7 +539,11 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
 
   if (props.stream !== null) {
     const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
-    if (props.stream.trim().length > 0) {
+    const streamTrimmed = props.stream.trim();
+    if (streamTrimmed.length > 0) {
+      if (streamTrimmed === SILENT_REPLY_TOKEN) {
+        return groupMessages(items);
+      }
       items.push({
         kind: "stream",
         key,

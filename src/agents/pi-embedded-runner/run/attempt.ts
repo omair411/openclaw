@@ -31,6 +31,7 @@ import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { resolveDefaultModelForAgent } from "../../model-selection.js";
+import { streamOllamaNative } from "../../ollama-native.js";
 import {
   isCloudCodeAssistFormatError,
   resolveBootstrapMaxChars,
@@ -515,7 +516,8 @@ export async function runEmbeddedAttempt(
       });
 
       // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
-      activeSession.agent.streamFn = streamSimple;
+      activeSession.agent.streamFn =
+        params.provider === "ollama" ? streamOllamaNative : streamSimple;
 
       applyExtraParamsToAgent(
         activeSession.agent,
@@ -523,6 +525,7 @@ export async function runEmbeddedAttempt(
         params.provider,
         params.modelId,
         params.streamParams,
+        params.model?.contextWindow,
       );
 
       if (cacheTrace) {

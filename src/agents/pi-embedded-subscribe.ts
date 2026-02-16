@@ -9,6 +9,7 @@ import { createStreamingDirectiveAccumulator } from "../auto-reply/reply/streami
 import { formatToolAggregate } from "../auto-reply/tool-meta.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { buildCodeSpanIndex, createInlineCodeState } from "../markdown/code-spans.js";
+import { didUseMemorySearch, normalizeMemorySearchEchoText } from "./memory-search-echo.js";
 import { EmbeddedBlockChunker } from "./pi-embedded-block-chunker.js";
 import {
   isMessagingToolDuplicateNormalized,
@@ -449,7 +450,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       return;
     }
     // Strip <think> and <final> blocks across chunk boundaries to avoid leaking reasoning.
-    const chunk = stripBlockTags(text, state.blockState).trimEnd();
+    const strippedChunk = stripBlockTags(text, state.blockState).trimEnd();
+    const chunk = normalizeMemorySearchEchoText({
+      text: strippedChunk,
+      memorySearchUsed: didUseMemorySearch(toolMetas),
+    });
     if (!chunk) {
       return;
     }

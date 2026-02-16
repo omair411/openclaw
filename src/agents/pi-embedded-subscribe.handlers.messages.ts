@@ -3,6 +3,7 @@ import type { EmbeddedPiSubscribeContext } from "./pi-embedded-subscribe.handler
 import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 import { createInlineCodeState } from "../markdown/code-spans.js";
+import { didUseMemorySearch, normalizeMemorySearchEchoText } from "./memory-search-echo.js";
 import {
   isMessagingToolDuplicateNormalized,
   normalizeTextForComparison,
@@ -211,7 +212,11 @@ export function handleMessageEnd(
     rawThinking: extractAssistantThinking(assistantMessage),
   });
 
-  const text = ctx.stripBlockTags(rawText, { thinking: false, final: false });
+  const memorySearchUsed = didUseMemorySearch(ctx.state.toolMetas);
+  const text = normalizeMemorySearchEchoText({
+    text: ctx.stripBlockTags(rawText, { thinking: false, final: false }),
+    memorySearchUsed,
+  });
   const rawThinking =
     ctx.state.includeReasoning || ctx.state.streamReasoning
       ? extractAssistantThinking(assistantMessage) || extractThinkingFromTaggedText(rawText)
@@ -226,7 +231,10 @@ export function handleMessageEnd(
   if (!cleanedText && !hasMedia) {
     const rawTrimmed = rawText.trim();
     const rawStrippedFinal = rawTrimmed.replace(/<\s*\/?\s*final\s*>/gi, "").trim();
-    const rawCandidate = rawStrippedFinal || rawTrimmed;
+    const rawCandidate = normalizeMemorySearchEchoText({
+      text: rawStrippedFinal || rawTrimmed,
+      memorySearchUsed,
+    });
     if (rawCandidate) {
       const parsedFallback = parseReplyDirectives(stripTrailingDirective(rawCandidate));
       cleanedText = parsedFallback.text ?? rawCandidate;
