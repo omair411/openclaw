@@ -1,23 +1,52 @@
 services:
+  squid:
+    image: ubuntu/squid:latest
+    volumes:
+      - ./squid/squid.conf:/etc/squid/squid.conf:ro
+    networks:
+      - egress
+      - outbound
+    restart: unless-stopped
+
   openclaw-gateway:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
+    env_file:
+      - "/Users/macbookpro/Library/Application Support/openclaw/secrets.env"
     environment:
       HOME: /home/node
       TERM: xterm-256color
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      # OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       # CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       # CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       # CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # OPENAI_API_KEY: ${OPENAI_API_KEY}
       OLLAMA_API_KEY: "ollama-local"
       OLLAMA_BASE_URL: "http://host.docker.internal:11434"
-
+      HTTP_PROXY: "http://squid:3128"
+      HTTPS_PROXY: "http://squid:3128"
+      NO_PROXY: "localhost,127.0.0.1,openclaw-gateway,openclaw-cli,squid,host.docker.internal"
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ../openclaw_sandbox/config/openclaw.json:/home/node/.openclaw/openclaw.json:ro
     ports:
-      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
-      - "127.0.0.1:${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+      - "18789:18789"
+      - "18790:18790"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/node/.cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2g
+    networks:
+      - egress
+      - hostpub
+    depends_on:
+      - squid
     init: true
     restart: unless-stopped
     command:
@@ -26,26 +55,57 @@ services:
         "dist/index.js",
         "gateway",
         "--bind",
-        "${OPENCLAW_GATEWAY_BIND:-loopback}",
+        "lan",
         "--port",
         "18789",
       ]
 
   openclaw-cli:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
+    env_file:
+      - "/Users/macbookpro/Library/Application Support/openclaw/secrets.env"
     environment:
       HOME: /home/node
       TERM: xterm-256color
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      # OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       OPENCLAW_GATEWAY_URL: "ws://openclaw-gateway:18789"
       BROWSER: echo
       # CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       # CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       # CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      HTTP_PROXY: "http://squid:3128"
+      HTTPS_PROXY: "http://squid:3128"
+      NO_PROXY: "localhost,127.0.0.1,openclaw-gateway,openclaw-cli,squid,host.docker.internal"
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ../openclaw_sandbox/config/openclaw.json:/home/node/.openclaw/openclaw.json:ro
     stdin_open: true
     tty: true
     init: true
     entrypoint: ["node", "dist/index.js"]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/node/.cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 1g
+    networks:
+      - egress
+    depends_on:
+      - squid
+
+networks:
+  # Private network between OpenClaw containers and Squid
+  egress:
+    internal: true
+  # Normal network with NAT to the internet (only Squid is attached)
+  outbound:
+    driver: bridge
+  # Non-internal bridge network used only so the gateway ports can be published to the Mac host
+  hostpub:
+    driver: bridge
